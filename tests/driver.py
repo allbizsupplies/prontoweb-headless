@@ -61,6 +61,17 @@ class DriverTest(unittest.TestCase):
         })
         self.assertIn("stock-code", seen_inputs)
 
+    def test_fill_datagrid_row(self):
+        self.driver.select_menu_item([
+            "Office Choice Main Menu",
+            "Web Site Category / Product Maintenance",
+            "Stockcode Review",
+        ])
+        self.driver.select_function_mode("&Find")
+        self.driver.fill_datagrid_row({
+            "1": "BIC-10206"
+        })
+
     def test_detect_form_error(self):
         self.driver.open_function("INV.M138")
         self.driver.select_function_mode("&Find")

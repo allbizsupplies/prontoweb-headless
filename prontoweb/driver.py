@@ -1,5 +1,6 @@
 
 import os
+import re
 from selenium import webdriver
 from selenium.common.exceptions import (
     NoSuchElementException,
@@ -81,6 +82,15 @@ class ProntoWebDriver(webdriver.Chrome):
                 break
         return seen_inputs
 
+    def fill_datagrid_row(self, values):
+        seen_inputs = []
+        while(True):
+            column_index, input = self.wait_for_next_datagrid_field(seen_inputs)
+            if input:
+                self.fill_datagrid_field(input, column_index, values)
+            else:
+                return
+
     def export_datagrid(self, wait_time=DEFAULT_WAIT_TIME):
         self.wait_for_clickable_element_by_id("export-view").click()
         return self.wait_for_download(wait_time)
@@ -107,15 +117,54 @@ class ProntoWebDriver(webdriver.Chrome):
                 raise TimeoutError()
             elapsed_time += DEFAULT_INTERVAL
 
+    def wait_for_next_datagrid_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
+        elapsed_time = 0.0
+        while(self.datagrid_is_open()):
+            element = self.switch_to.active_element
+            name = element.get_attribute("name")
+            classes = element.get_attribute("class")
+            if name == "OK":
+                error_message = self.wait_for_element_by_css_selector(
+                    ".pro-card-dialog.ui-draggable label",
+                    wait_time=1
+                ).get_attribute("title")
+                raise FormException(
+                    "{}: {}".format(seen_inputs[-1], error_message))
+            if name and classes and name not in seen_inputs and "screen-field" in classes:
+                matches = re.match("^C:(\d+),R:\d+$", name)
+                if matches:
+                    seen_inputs.append(name)
+                    column_index = matches[1]
+                    return column_index, element
+            # Check for the presence of an error dialog.
+            sleep(0.1)
+            if elapsed_time >= wait_time:
+                raise TimeoutError()
+            elapsed_time += DEFAULT_INTERVAL
+        return None, None
+
     def fill_form_field(self, input, values):
         name = input.get_attribute("name")
         if name in values.keys():
             input.send_keys(values[name])
         input.send_keys(Keys.RETURN)
 
+    def fill_datagrid_field(self, input, column_index, values):
+        name = input.get_attribute("name")
+        if column_index in values.keys():
+            input.send_keys(values[column_index])
+        input.send_keys(Keys.RETURN)
+
     def form_is_open(self):
         try:
             self.find_element_by_class_name("mode-ok")
+            return True
+        except NoSuchElementException:
+            return False
+
+    def datagrid_is_open(self):
+        try:
+            self.find_element_by_class_name("data-tbody input")
             return True
         except NoSuchElementException:
             return False
@@ -202,7 +251,8 @@ class ProntoWebDriver(webdriver.Chrome):
         while (time_elapsed < wait_time):
             files = os.listdir(self.download_dir)
             if files:
-                return files[0]
+                if "tempFileName.ods" in files or "tempFileName.xlsx" in files:
+                    return files[0]
             sleep(1)
             time_elapsed += 1
         raise Exception("Did not receive downloaded file")

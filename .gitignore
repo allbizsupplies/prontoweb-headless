@@ -1,0 +1,5 @@
+__pycache__/
+.vscode
+chromedriver_profile/
+chromedriver.log
+settings.py

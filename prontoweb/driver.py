@@ -52,19 +52,18 @@ class ProntoWebDriver(webdriver.Chrome):
             wait_time=60)
 
     def open_function(self, code):
-        shortcut_input = self.wait_for_clickable_element_by_id(
+        element = self.wait_for_clickable_element_by_id(
             "header-shortcut")
-        shortcut_input.click()
-        shortcut_input.send_keys(code)
-        shortcut_input.send_keys(Keys.RETURN)
+        element.click()
+        element.send_keys(code)
+        element.send_keys(Keys.RETURN)
         self.wait_for_input_value(
             (By.ID, "header-shortcut"),
             code.replace(".", " "),
             wait_time=30)
 
     def select_function_mode(self, name):
-        mode_button = self.wait_for_clickable_element_by_name(name)
-        mode_button.click()
+        self.wait_for_clickable_element_by_name(name).click()
         self.wait_until(element_has_any_css_class((By.NAME, name), ["hidden", "disabled"]))
 
     def select_menu_item(self, values):
@@ -75,9 +74,9 @@ class ProntoWebDriver(webdriver.Chrome):
         self.wait_for_clickable_element_by_class_name("mode-ok")
         seen_inputs = []
         while(True):
-            input = self.wait_for_next_form_field(seen_inputs)
-            if input:
-                self.fill_form_field(input, values)
+            element = self.wait_for_next_form_field(seen_inputs)
+            if element:
+                self.fill_form_field(element, values)
             else:
                 break
         return seen_inputs
@@ -85,9 +84,9 @@ class ProntoWebDriver(webdriver.Chrome):
     def fill_datagrid_row(self, values):
         seen_inputs = []
         while(True):
-            column_index, input = self.wait_for_next_datagrid_field(seen_inputs)
-            if input:
-                self.fill_datagrid_field(input, column_index, values)
+            column_index, element = self.wait_for_next_datagrid_field(seen_inputs)
+            if element:
+                self.fill_datagrid_field(element, column_index, values)
             else:
                 return
 
@@ -98,17 +97,10 @@ class ProntoWebDriver(webdriver.Chrome):
     def wait_for_next_form_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
         elapsed_time = 0.0
         while(self.form_is_open()):
-            element = self.switch_to.active_element
-            name = element.get_attribute("name")
-            classes = element.get_attribute("class")
-            if name == "OK":
-                error_message = self.wait_for_element_by_css_selector(
-                    ".pro-card-dialog.ui-draggable label",
-                    wait_time=1
-                ).get_attribute("title")
-                raise FormException(
-                    "{}: {}".format(seen_inputs[-1], error_message))
-            if name and classes and name not in seen_inputs and "screen-field" in classes:
+            self.detect_error_dialog(seen_inputs)
+            element = self.detect_active_input(seen_inputs)
+            if element:
+                name = element.get_attribute("name")
                 seen_inputs.append(name)
                 return element
             # Check for the presence of an error dialog.
@@ -120,17 +112,10 @@ class ProntoWebDriver(webdriver.Chrome):
     def wait_for_next_datagrid_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
         elapsed_time = 0.0
         while(self.datagrid_is_open()):
-            element = self.switch_to.active_element
-            name = element.get_attribute("name")
-            classes = element.get_attribute("class")
-            if name == "OK":
-                error_message = self.wait_for_element_by_css_selector(
-                    ".pro-card-dialog.ui-draggable label",
-                    wait_time=1
-                ).get_attribute("title")
-                raise FormException(
-                    "{}: {}".format(seen_inputs[-1], error_message))
-            if name and classes and name not in seen_inputs and "screen-field" in classes:
+            self.detect_error_dialog(seen_inputs)
+            element = self.detect_active_input(seen_inputs)
+            if element:
+                name = element.get_attribute("name")
                 matches = re.match("^C:(\d+),R:\d+$", name)
                 if matches:
                     seen_inputs.append(name)
@@ -143,17 +128,17 @@ class ProntoWebDriver(webdriver.Chrome):
             elapsed_time += DEFAULT_INTERVAL
         return None, None
 
-    def fill_form_field(self, input, values):
-        name = input.get_attribute("name")
+    def fill_form_field(self, element, values):
+        name = element.get_attribute("name")
         if name in values.keys():
-            input.send_keys(values[name])
-        input.send_keys(Keys.RETURN)
+            element.send_keys(values[name])
+        element.send_keys(Keys.RETURN)
 
-    def fill_datagrid_field(self, input, column_index, values):
-        name = input.get_attribute("name")
+    def fill_datagrid_field(self, element, column_index, values):
+        name = element.get_attribute("name")
         if column_index in values.keys():
-            input.send_keys(values[column_index])
-        input.send_keys(Keys.RETURN)
+            element.send_keys(values[column_index])
+        element.send_keys(Keys.RETURN)
 
     def form_is_open(self):
         try:
@@ -168,6 +153,24 @@ class ProntoWebDriver(webdriver.Chrome):
             return True
         except NoSuchElementException:
             return False
+
+    def detect_active_input(self, seen_inputs):
+        element = self.switch_to.active_element
+        name = element.get_attribute("name")
+        classes = element.get_attribute("class")
+        if name and classes and name not in seen_inputs and "screen-field" in classes:
+            return element
+
+    def detect_error_dialog(self, seen_inputs):
+        element = self.switch_to.active_element
+        name = element.get_attribute("name")
+        if name == "OK":
+            error_message = self.wait_for_element_by_css_selector(
+                ".pro-card-dialog.ui-draggable label",
+                wait_time=1
+            ).get_attribute("title")
+            raise FormException(
+                "{}: {}".format(seen_inputs[-1], error_message))
 
     def wait_for_clickable_element_by_class_name(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
@@ -296,6 +299,7 @@ class element_has_any_css_class(object):
     def __call__(self, driver):
         # Finding the referenced element
         element = driver.find_element(*self.locator)
+        # TDOD this intermittently triggers a StaleElementReferenceException
         element_css_classes = element.get_attribute("class")
         for css_class in self.css_classes:
             if css_class in element_css_classes:

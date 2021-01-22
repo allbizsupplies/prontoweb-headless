@@ -19,8 +19,8 @@ class DriverTest(unittest.TestCase):
         self.driver.close()
         download_dir = os.path.join(os.getcwd(), "downloads")
         existing_files = os.listdir(download_dir)
-        # for file in existing_files:
-        #     os.unlink(os.path.join(download_dir, file))
+        for file in existing_files:
+            os.unlink(os.path.join(download_dir, file))
 
     def start_session(self):
         download_dir = os.path.join(os.getcwd(), "downloads")

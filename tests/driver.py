@@ -68,10 +68,9 @@ class DriverTest(unittest.TestCase):
     def test_fill_form(self):
         self.driver.open_function("INV.M138")
         self.driver.select_function_mode("&Find")
-        seen_inputs = self.driver.fill_form({
+        self.driver.fill_form({
             "stock-code": "BIC-10206"
         })
-        self.assertIn("stock-code", seen_inputs)
 
     def test_fill_datagrid_row(self):
         self.driver.select_menu_item([
@@ -82,6 +81,22 @@ class DriverTest(unittest.TestCase):
         self.driver.fill_datagrid_row({
             "0": "BIC-10206"
         })
+
+    def test_fill_multiple_datagrid_rows(self):
+        self.driver.open_function("INV.M138")
+        self.driver.select_extra_function_mode("GTIN/&Multi UOM")
+        fake_gtin_codes = []
+        for i in range(2):
+            fake_gtin_codes.append(
+                "".join([str(randint(1, 9)) for j in range(10)]))
+        for fake_gtin_code in fake_gtin_codes:
+            self.driver.select_function_mode("&Entry")
+            self.driver.fill_datagrid_row({
+                "0": fake_gtin_code,
+                "1": "TIN",
+                "2": "1",
+                "9": "N",
+            })
 
     def test_detect_form_error(self):
         self.driver.open_function("INV.M138")

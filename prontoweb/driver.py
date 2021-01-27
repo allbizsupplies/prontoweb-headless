@@ -95,17 +95,31 @@ class ProntoWebDriver(webdriver.Chrome):
         while(True):
             element = self.wait_for_next_form_field(seen_inputs)
             if element:
+                name = element.get_attribute("name")
+                if name in seen_inputs:
+                    self.cancel_form()
+                    return
                 self.fill_form_field(element, values)
+                self.wait_for_input_to_lose_focus(name)
+                seen_inputs.append(name)
             else:
-                break
-        return seen_inputs
+                return
 
     def fill_datagrid_row(self, values):
         seen_inputs = []
+        element = self.wait_for_next_datagrid_field(seen_inputs)
+        expected_row_index = self.get_datagrid_input_row_index(element)
         while(True):
-            column_index, element = self.wait_for_next_datagrid_field(seen_inputs)
+            element = self.wait_for_next_datagrid_field(seen_inputs)
             if element:
-                self.fill_datagrid_field(element, column_index, values)
+                name = element.get_attribute("name")
+                row_index = self.get_datagrid_input_row_index(element)
+                if row_index != expected_row_index:
+                    self.cancel_form()
+                    return
+                self.fill_datagrid_field(element, values)
+                self.wait_for_input_to_lose_focus(name)
+                seen_inputs.append(name)
             else:
                 return
 
@@ -113,47 +127,14 @@ class ProntoWebDriver(webdriver.Chrome):
         self.wait_for_clickable_element_by_id("export-view").click()
         return self.wait_for_download(wait_time)
 
-    def wait_for_next_form_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
-        elapsed_time = 0.0
-        while(self.form_is_open()):
-            self.detect_error_dialog(seen_inputs)
-            element = self.detect_active_input(seen_inputs)
-            if element:
-                name = element.get_attribute("name")
-                seen_inputs.append(name)
-                return element
-            # Check for the presence of an error dialog.
-            sleep(0.1)
-            if elapsed_time >= wait_time:
-                raise TimeoutError()
-            elapsed_time += DEFAULT_INTERVAL
-
-    def wait_for_next_datagrid_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
-        elapsed_time = 0.0
-        while(self.datagrid_is_open()):
-            self.detect_error_dialog(seen_inputs)
-            element = self.detect_active_input(seen_inputs)
-            if element:
-                name = element.get_attribute("name")
-                matches = re.match("^C:([0-9]+),R:[0-9]+$", name)
-                if matches:
-                    seen_inputs.append(name)
-                    column_index = matches[1]
-                    return column_index, element
-            # Check for the presence of an error dialog.
-            sleep(0.1)
-            if elapsed_time >= wait_time:
-                raise TimeoutError()
-            elapsed_time += DEFAULT_INTERVAL
-        return None, None
-
     def fill_form_field(self, element, values):
         name = element.get_attribute("name")
         if name in values.keys():
             element.send_keys(values[name])
         element.send_keys(Keys.RETURN)
 
-    def fill_datagrid_field(self, element, column_index, values):
+    def fill_datagrid_field(self, element, values):
+        column_index = self.get_datagrid_input_column_index(element)
         if column_index in values.keys():
             element.send_keys(values[column_index])
         element.send_keys(Keys.RETURN)
@@ -172,23 +153,96 @@ class ProntoWebDriver(webdriver.Chrome):
         except NoSuchElementException:
             return False
 
-    def detect_active_input(self, seen_inputs):
-        element = self.switch_to.active_element
-        name = element.get_attribute("name")
-        classes = element.get_attribute("class")
-        if name and classes and name not in seen_inputs and "screen-field" in classes:
-            return element
+    def detect_active_input(self):
+        for attempt_count in range(10):
+            try:
+                element = self.switch_to.active_element
+                name = element.get_attribute("name")
+                classes = element.get_attribute("class")
+                if name and classes and "screen-field" in classes:
+                    return element
+                return
+            except StaleElementReferenceException as ex:
+                if attempt_count == 9:
+                    raise ex
+            attempt_count += 1
+            sleep(DEFAULT_INTERVAL)
 
     def detect_error_dialog(self, seen_inputs):
-        element = self.switch_to.active_element
+        for attempt_count in range(10):
+            try:
+                element = self.switch_to.active_element
+                name = element.get_attribute("name")
+                if name == "OK":
+                    error_message = self.wait_for_element_by_css_selector(
+                        ".pro-card-dialog.ui-draggable label",
+                        wait_time=1
+                    ).get_attribute("title")
+                    raise FormException(
+                        "{}: {}".format(seen_inputs[-1], error_message))
+                return
+            except StaleElementReferenceException as ex:
+                if attempt_count == 9:
+                    raise ex
+            attempt_count += 1
+            sleep(DEFAULT_INTERVAL)
+
+    def get_datagrid_input_column_index(self, element):
         name = element.get_attribute("name")
-        if name == "OK":
-            error_message = self.wait_for_element_by_css_selector(
-                ".pro-card-dialog.ui-draggable label",
-                wait_time=1
-            ).get_attribute("title")
-            raise FormException(
-                "{}: {}".format(seen_inputs[-1], error_message))
+        matches = re.match("^C:([0-9]+),R:[0-9]+$", name)
+        if matches:
+            return matches[1]
+
+    def get_datagrid_input_row_index(self, element):
+        name = element.get_attribute("name")
+        matches = re.match("^C:[0-9]+,R:([0-9]+)$", name)
+        if matches:
+            return matches[1]
+
+    def wait_for_next_form_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
+        elapsed_time = 0.0
+        while(self.form_is_open()):
+            self.detect_error_dialog(seen_inputs)
+            element = self.detect_active_input()
+            if element:
+                name = element.get_attribute("name")
+                if name not in seen_inputs:
+                    return element
+            # Check for the presence of an error dialog.
+            sleep(DEFAULT_INTERVAL)
+            if elapsed_time >= wait_time:
+                raise TimeoutError()
+            elapsed_time += DEFAULT_INTERVAL
+
+    def wait_for_next_datagrid_field(self, seen_inputs, wait_time=DEFAULT_WAIT_TIME):
+        elapsed_time = 0.0
+        while(self.datagrid_is_open()):
+            self.detect_error_dialog(seen_inputs)
+            element = self.detect_active_input()
+            name = element.get_attribute("name")
+            if element and name not in seen_inputs:
+                matches = re.match("^C:([0-9]+),R:[0-9]+$", name)
+                if matches:
+                    return element
+            # Check for the presence of an error dialog.
+            sleep(DEFAULT_INTERVAL)
+            if elapsed_time >= wait_time:
+                raise TimeoutError()
+            elapsed_time += DEFAULT_INTERVAL
+
+    def wait_for_input_to_lose_focus(self, name, wait_time=DEFAULT_WAIT_TIME):
+        for attempt_count in range(10):
+            try:
+                element = self.detect_active_input()
+                if element is None or element.get_attribute("name") != name:
+                    return
+                if attempt_count == 9:
+                    raise TimeoutError()
+            except StaleElementReferenceException as ex:
+                if attempt_count == 9:
+                    raise ex
+            attempt_count += 1
+            sleep(DEFAULT_INTERVAL)
 
     def wait_for_clickable_element_by_class_name(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
@@ -299,12 +353,18 @@ class ProntoWebDriver(webdriver.Chrome):
     def close_function(self):
         webdriver.ActionChains(self).send_keys(Keys.ESCAPE).perform()
 
+    def cancel_form(self):
+        webdriver.ActionChains(self).send_keys(Keys.ESCAPE).perform()
+
 
 def wait(driver, wait_time):
     return WebDriverWait(
         driver,
         wait_time,
-        ignored_exceptions=(NoSuchElementException,StaleElementReferenceException,))
+        ignored_exceptions=(
+            NoSuchElementException,
+            StaleElementReferenceException,
+        ))
 
 
 class element_has_css_class(object):

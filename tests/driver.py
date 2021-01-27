@@ -67,9 +67,9 @@ class DriverTest(unittest.TestCase):
 
     def test_fill_form(self):
         self.driver.open_function("INV.M138")
-        self.driver.select_function_mode("&Find")
+        self.driver.select_function_mode("&Correct")
         self.driver.fill_form({
-            "stock-code": "BIC-10206"
+            "stk-condition-code": "I"
         })
 
     def test_fill_datagrid_row(self):

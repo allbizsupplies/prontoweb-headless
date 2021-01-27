@@ -74,6 +74,13 @@ class ProntoWebDriver(webdriver.Chrome):
             code.replace(".", " "),
             wait_time=30)
 
+    def select_extra_function_mode(self, name):
+        extra_button_xpath = "//button[@name='E&xtra'][contains(@class, 'mode')]"
+        self.wait_for_clickable_element_by_xpath(extra_button_xpath).click()
+        self.wait_until(element_has_any_css_class((By.XPATH, extra_button_xpath), ["hidden", "disabled"]))
+        self.wait_for_clickable_element_by_name(name).click()
+        self.wait_until(EC.invisibility_of_element_located((By.NAME, name)))
+
     def select_function_mode(self, name):
         self.wait_for_clickable_element_by_name(name).click()
         self.wait_until(element_has_any_css_class((By.NAME, name), ["hidden", "disabled"]))
@@ -185,28 +192,28 @@ class ProntoWebDriver(webdriver.Chrome):
 
     def wait_for_clickable_element_by_class_name(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.element_to_be_clickable((By.CLASS_NAME, value)))
         except TimeoutException:
             raise TimeoutException("Class name: " + value)
 
     def wait_for_clickable_element_by_css_selector(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, value)))
         except TimeoutException:
             raise TimeoutException("CSS selector: " + value)
 
     def wait_for_clickable_element_by_id(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.element_to_be_clickable((By.ID, value)))
         except TimeoutException:
             raise TimeoutException("ID: " + value)
 
     def wait_for_clickable_element_by_name(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.element_to_be_clickable((By.NAME, value)))
         except TimeoutException:
             raise TimeoutException("Name: " + value)
@@ -214,7 +221,7 @@ class ProntoWebDriver(webdriver.Chrome):
     def wait_for_clickable_element_by_text(self, value, wait_time=DEFAULT_WAIT_TIME):
         locator = (By.XPATH, "//*[text()='{}']".format(value))
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.element_to_be_clickable(locator))
         except TimeoutException:
             raise TimeoutException("Text: " + value)
@@ -222,28 +229,28 @@ class ProntoWebDriver(webdriver.Chrome):
     def wait_for_clickable_element_by_xpath(self, value, wait_time=DEFAULT_WAIT_TIME):
         locator = (By.XPATH, value)
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.element_to_be_clickable(locator))
         except TimeoutException:
             raise TimeoutException("XPath: " + value)
 
     def wait_for_element_by_css_selector(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, value)))
         except TimeoutException:
             raise TimeoutException("CSS selector: " + value)
 
     def wait_for_element_by_id(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.presence_of_element_located((By.ID, value)))
         except TimeoutException:
             raise TimeoutException("ID: " + value)
 
     def wait_for_element_by_name(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.presence_of_element_located((By.NAME, value)))
         except TimeoutException:
             raise TimeoutException("Name: " + value)
@@ -251,21 +258,21 @@ class ProntoWebDriver(webdriver.Chrome):
     def wait_for_element_by_text(self, value, wait_time=DEFAULT_WAIT_TIME):
         locator = (By.XPATH, "//[text()='{}']".format(value))
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.presence_of_element_located(locator))
         except TimeoutException:
             raise TimeoutException("Text: " + value)
 
     def wait_for_element_by_xpath(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.presence_of_element_located((By.XPATH, value)))
         except TimeoutException:
             raise TimeoutException("XPath: " + value)
 
     def wait_for_input_value(self, locator, value, wait_time=DEFAULT_WAIT_TIME):
         try:
-            return WebDriverWait(self, wait_time).until(
+            return wait(self, wait_time).until(
                 EC.text_to_be_present_in_element_value(locator, value))
         except TimeoutException:
             print("wait_time:", wait_time)
@@ -287,10 +294,17 @@ class ProntoWebDriver(webdriver.Chrome):
         raise Exception("Did not receive downloaded file")
 
     def wait_until(self, expected_condition, wait_time=DEFAULT_WAIT_TIME):
-        return WebDriverWait(self, wait_time).until(expected_condition)
+        return wait(self, wait_time).until(expected_condition)
 
     def close_function(self):
         webdriver.ActionChains(self).send_keys(Keys.ESCAPE).perform()
+
+
+def wait(driver, wait_time):
+    return WebDriverWait(
+        driver,
+        wait_time,
+        ignored_exceptions=(NoSuchElementException,StaleElementReferenceException,))
 
 
 class element_has_css_class(object):
@@ -325,7 +339,6 @@ class element_has_any_css_class(object):
     def __call__(self, driver):
         # Finding the referenced element
         element = driver.find_element(*self.locator)
-        # TDOD this intermittently triggers a StaleElementReferenceException
         element_css_classes = element.get_attribute("class")
         for css_class in self.css_classes:
             if css_class in element_css_classes:

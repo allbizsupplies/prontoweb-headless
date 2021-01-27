@@ -2,6 +2,7 @@
 from nose.tools import assert_equal, assert_in
 import logging
 import os
+from random import randint
 import settings
 from time import sleep
 import unittest
@@ -14,6 +15,7 @@ class DriverTest(unittest.TestCase):
 
     def setUp(self):
         self.driver = self.start_session()
+        self.driver.select_company("TEST-Allbiz")
 
     def tearDown(self):
         self.driver.close()
@@ -35,12 +37,14 @@ class DriverTest(unittest.TestCase):
         return driver
 
     def test_select_company(self):
-        self.driver.select_company("TEST-Allbiz")
         self.driver.select_company("Allbiz Supplies Pty. Ltd.")
+        self.driver.select_company("TEST-Allbiz")
 
     def test_download_datagrid(self):
-        self.driver.select_menu_item(
-            ["Inventory Reports", "DI Price Algorithm Rules"])
+        self.driver.select_menu_item([
+            "Inventory Reports", 
+            "DI Price Algorithm Rules",
+        ])
         filename = self.driver.export_datagrid()
         self.driver.close_function()
         self.assertEqual("tempFileName.ods", filename)
@@ -51,6 +55,10 @@ class DriverTest(unittest.TestCase):
     def test_select_function_mode(self):
         self.driver.open_function("INV.M138")
         self.driver.select_function_mode("&Find")
+
+    def test_select_extra_function_mode(self):
+        self.driver.open_function("INV.M138")
+        self.driver.select_extra_function_mode("GTIN/&Multi UOM")
 
     def test_select_nested_function_mode(self):
         self.driver.open_function("INV.M138")
@@ -67,13 +75,12 @@ class DriverTest(unittest.TestCase):
 
     def test_fill_datagrid_row(self):
         self.driver.select_menu_item([
-            "Office Choice Main Menu",
-            "Web Site Category / Product Maintenance",
-            "Stockcode Review",
+            "Inventory Reports",
+            "Stock Control datagrid",
         ])
         self.driver.select_function_mode("&Find")
         self.driver.fill_datagrid_row({
-            "1": "BIC-10206"
+            "0": "BIC-10206"
         })
 
     def test_detect_form_error(self):

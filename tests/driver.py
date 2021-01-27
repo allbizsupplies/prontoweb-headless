@@ -101,7 +101,6 @@ class DriverTest(unittest.TestCase):
     def test_detect_form_error(self):
         self.driver.open_function("INV.M138")
         self.driver.select_function_mode("&Find")
-        # with self.assertRaises(FormException):
         with self.assertRaises(FormException):
             self.driver.fill_form({
                 "stock-code": "SLARTIBARTFAST"

@@ -51,6 +51,18 @@ class ProntoWebDriver(webdriver.Chrome):
             (By.ID, "header-shortcut"), DEFAULT_FUNCTION.replace(".", " "),
             wait_time=60)
 
+    def select_company(self, company_name):
+        element = self.wait_for_element_by_css_selector("#header-company .company")
+        # Don't switch companies if we are already on the correct company.
+        if element.text == company_name:
+            return
+        self.wait_for_clickable_element_by_xpath("//div[@class='user-menu']/a").click()
+        self.wait_for_clickable_element_by_xpath(
+            "//div[@class='settings']//li[text()='{}']".format(company_name)
+        ).click()
+        self.wait_for_element_by_xpath(
+            "//div[@id='header-company']/div[text()='{}']".format(company_name))
+
     def open_function(self, code):
         element = self.wait_for_clickable_element_by_id(
             "header-shortcut")
@@ -116,7 +128,7 @@ class ProntoWebDriver(webdriver.Chrome):
             element = self.detect_active_input(seen_inputs)
             if element:
                 name = element.get_attribute("name")
-                matches = re.match("^C:(\d+),R:\d+$", name)
+                matches = re.match("^C:([0-9]+),R:[0-9]+$", name)
                 if matches:
                     seen_inputs.append(name)
                     column_index = matches[1]
@@ -135,7 +147,6 @@ class ProntoWebDriver(webdriver.Chrome):
         element.send_keys(Keys.RETURN)
 
     def fill_datagrid_field(self, element, column_index, values):
-        name = element.get_attribute("name")
         if column_index in values.keys():
             element.send_keys(values[column_index])
         element.send_keys(Keys.RETURN)
@@ -177,7 +188,14 @@ class ProntoWebDriver(webdriver.Chrome):
             return WebDriverWait(self, wait_time).until(
                 EC.element_to_be_clickable((By.CLASS_NAME, value)))
         except TimeoutException:
-            raise TimeoutException("ID: " + value)
+            raise TimeoutException("Class name: " + value)
+
+    def wait_for_clickable_element_by_css_selector(self, value, wait_time=DEFAULT_WAIT_TIME):
+        try:
+            return WebDriverWait(self, wait_time).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, value)))
+        except TimeoutException:
+            raise TimeoutException("CSS selector: " + value)
 
     def wait_for_clickable_element_by_id(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:
@@ -200,6 +218,14 @@ class ProntoWebDriver(webdriver.Chrome):
                 EC.element_to_be_clickable(locator))
         except TimeoutException:
             raise TimeoutException("Text: " + value)
+
+    def wait_for_clickable_element_by_xpath(self, value, wait_time=DEFAULT_WAIT_TIME):
+        locator = (By.XPATH, value)
+        try:
+            return WebDriverWait(self, wait_time).until(
+                EC.element_to_be_clickable(locator))
+        except TimeoutException:
+            raise TimeoutException("XPath: " + value)
 
     def wait_for_element_by_css_selector(self, value, wait_time=DEFAULT_WAIT_TIME):
         try:

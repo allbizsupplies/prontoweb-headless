@@ -34,6 +34,10 @@ class DriverTest(unittest.TestCase):
             settings.PRONTO_PASSWORD)
         return driver
 
+    def test_select_company(self):
+        self.driver.select_company("TEST-Allbiz")
+        self.driver.select_company("Allbiz Supplies Pty. Ltd.")
+
     def test_download_datagrid(self):
         self.driver.select_menu_item(
             ["Inventory Reports", "DI Price Algorithm Rules"])

@@ -95,7 +95,6 @@ class ProntoWebDriver(webdriver.Chrome):
             self.wait_for_clickable_element_by_text(value).click()
 
     def fill_form(self, values):
-        self.wait_for_clickable_element_by_class_name("mode-ok")
         seen_inputs = []
         while(True):
             element = self.wait_for_next_form_field(seen_inputs)
@@ -145,11 +144,9 @@ class ProntoWebDriver(webdriver.Chrome):
         element.send_keys(Keys.RETURN)
 
     def form_is_open(self):
-        try:
-            self.find_element_by_class_name("mode-ok")
-            return True
-        except NoSuchElementException:
-            return False
+        element = self.switch_to.active_element
+        classes = element.get_attribute("class")
+        return "screen-field" in classes
 
     def datagrid_is_open(self):
         try:

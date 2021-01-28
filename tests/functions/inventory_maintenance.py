@@ -36,3 +36,31 @@ class InvMaintTest(DriverTestBase):
         self.function.find_record(item_code)
         self.function.open_warehouse_stock_mode()
         self.function.find_warehouse_stock_record(warehouse_code)
+
+    def test_update_warehouse_stock_record(self):
+        item_code = "BIC-10206"
+        warehouse_code = "ALB"
+        values = {
+            "whse-bin-location": str(randint(1000, 9999))
+        }
+        self.function.open()
+        self.function.update_warehouse_stock_record(
+            item_code, warehouse_code, values)
+
+    def test_find_supplier_record(self):
+        item_code = "BIC-10206"
+        supplier_code = "GNS"
+        self.function.open()
+        self.function.find_record(item_code)
+        self.function.open_supplier_mode()
+        self.function.find_supplier_record(supplier_code)
+
+    def test_update_supplier_record(self):
+        item_code = "BIC-10206"
+        supplier_code = "GNS"
+        values = {
+            "sup-stock-code": str(randint(1000, 9999))
+        }
+        self.function.open()
+        self.function.update_supplier_record(
+            item_code, supplier_code, values)

@@ -1,40 +1,20 @@
 
+from tests import DriverTestBase
 from nose.tools import assert_equal, assert_in
-import logging
 import os
 from random import randint
-import settings
 from time import sleep
-import unittest
-from prontoweb.driver import ProntoWebDriver, FormException
-
-logging.disable()
+from prontoweb.driver import FormException
 
 
-class DriverTest(unittest.TestCase):
-
-    def setUp(self):
-        self.driver = self.start_session()
-        self.driver.select_company("TEST-Allbiz")
+class DriverTest(DriverTestBase):
 
     def tearDown(self):
-        self.driver.close()
+        super().tearDown()
         download_dir = os.path.join(os.getcwd(), "downloads")
         existing_files = os.listdir(download_dir)
         for file in existing_files:
             os.unlink(os.path.join(download_dir, file))
-
-    def start_session(self):
-        download_dir = os.path.join(os.getcwd(), "downloads")
-        driver = ProntoWebDriver(
-            headless=(not settings.DEBUG),
-            download_dir=download_dir
-        )
-        driver.login(
-            settings.PRONTOWEB_URL,
-            settings.PRONTO_USERNAME,
-            settings.PRONTO_PASSWORD)
-        return driver
 
     def test_select_company(self):
         self.driver.select_company("Allbiz Supplies Pty. Ltd.")
@@ -62,7 +42,7 @@ class DriverTest(unittest.TestCase):
 
     def test_select_nested_function_mode(self):
         self.driver.open_function("INV.M138")
-        self.driver.select_function_mode("&Whse")
+        self.driver.select_function_mode("&Whse", opens_new_card=True)
         self.driver.select_function_mode("&Correct")
 
     def test_fill_form(self):

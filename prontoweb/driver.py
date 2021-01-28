@@ -81,9 +81,14 @@ class ProntoWebDriver(webdriver.Chrome):
         self.wait_for_clickable_element_by_name(name).click()
         self.wait_until(EC.invisibility_of_element_located((By.NAME, name)))
 
-    def select_function_mode(self, name):
-        self.wait_for_clickable_element_by_name(name).click()
-        self.wait_until(element_has_any_css_class((By.NAME, name), ["hidden", "disabled"]))
+    def select_function_mode(self, name, opens_new_card=False):
+        if opens_new_card:
+            accordion_length = self.detect_accordion_length()
+            self.wait_for_clickable_element_by_name(name).click()
+            self.wait_until(accordion_has_length(accordion_length + 1))
+        else:
+            self.wait_for_clickable_element_by_name(name).click()
+            self.wait_until(element_has_any_css_class((By.NAME, name), ["hidden", "disabled"]))
 
     def select_menu_item(self, values):
         for value in values:
@@ -186,6 +191,10 @@ class ProntoWebDriver(webdriver.Chrome):
                     raise ex
             attempt_count += 1
             sleep(DEFAULT_INTERVAL)
+
+    def detect_accordion_length(self):
+        elements = self.find_elements(By.CLASS_NAME, "accordion-cell")
+        return len(elements) if elements else 0
 
     def get_datagrid_input_column_index(self, element):
         name = element.get_attribute("name")
@@ -404,6 +413,15 @@ class element_has_any_css_class(object):
             if css_class in element_css_classes:
                 return element
         return False
+
+
+class accordion_has_length(object):
+
+    def __init__(self, expected_length):
+        self.expected_length = expected_length
+
+    def __call__(self, driver):
+        return driver.detect_accordion_length() == self.expected_length
 
 
 class FormException(BaseException):
